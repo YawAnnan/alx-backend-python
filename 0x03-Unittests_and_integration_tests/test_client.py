@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Unit tests for client.GithubOrgClient"""
+"""Unit and integration tests for client.GithubOrgClient"""
 
 import unittest
-from unittest.mock import patch, PropertyMock
-from parameterized import parameterized
+from unittest.mock import patch, PropertyMock, MagicMock
+from parameterized import parameterized, parameterized_class
 
 from client import GithubOrgClient
+from fixtures import org_payload, repos_payload, expected_repos, apache2_repos
 
 
 class TestGithubOrgClient(unittest.TestCase):
-    """Test case for GithubOrgClient"""
+    """Unit tests for GithubOrgClient"""
 
     @parameterized.expand([
         ("google",),
@@ -84,5 +85,32 @@ class TestGithubOrgClient(unittest.TestCase):
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
+@parameterized_class((
+    "org_payload", "repos_payload", "expected_repos", "apache2_repos"
+), [
+    (org_payload, repos_payload, expected_repos, apache2_repos),
+])
+class TestIntegrationGithubOrgClient(unittest.TestCase):
+    """Integration tests for GithubOrgClient.public_repos"""
+
+    @classmethod
+    def setUpClass(cls):
+        """Start patcher for requests.get"""
+        cls.get_patcher = patch("requests.get")
+        mock_get = cls.get_patcher.start()
+
+        # Configure side effect for requests.get().json()
+        def side_effect(url):
+            mock_response = MagicMock()
+            if url.endswith("/orgs/google"):
+                mock_response.json.return_value = cls.org_payload
+            elif url.endswith("/orgs/google/repos"):
+                mock_response.json.return_value = cls.repos_payload
+            return mock_response
+
+        mock_get.side_effect = side_effect
+
+    @classmethod
+    def tearDownClass(cls):
+        """Stop patcher"""
+        cls.get_patcher.stop()
