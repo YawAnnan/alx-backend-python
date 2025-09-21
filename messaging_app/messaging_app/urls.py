@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('chats.urls')),  # all API endpoints under /api/
+    path('api-auth/', include('rest_framework.urls')),
 ]
 
 if settings.DEBUG:
@@ -18,5 +19,3 @@ if settings.DEBUG:
 # and consider security best practices.
 
 # End of file
-
-
