@@ -6,7 +6,6 @@ from django.contrib.auth.models import AbstractUser
 class User(AbstractUser):
     """Custom user model extending Django's AbstractUser"""
 
-    # Override the default id with UUID
     user_id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, unique=True
     )
@@ -21,6 +20,9 @@ class User(AbstractUser):
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default="guest")
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Explicitly define password field (even though AbstractUser already has it)
+    password = models.CharField(max_length=128, null=False, blank=False)
 
     USERNAME_FIELD = "email"   # authentication uses email instead of username
     REQUIRED_FIELDS = ["username", "first_name", "last_name"]
