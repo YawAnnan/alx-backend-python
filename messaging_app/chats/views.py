@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
@@ -8,14 +8,15 @@ from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 
 
-class ConversationViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for listing and creating Conversations
-    """
 
+
+class ConversationViewSet(viewsets.ModelViewSet):
+    """ViewSet for Conversations"""
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
-
+    filter_backends = [filters.SearchFilter]   # ✅ use filters
+    search_fields = ['participants__first_name', 'participants__last_name']
+    
     def create(self, request, *args, **kwargs):
         """
         Create a new conversation with participants
@@ -35,13 +36,17 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class MessageViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for listing and creating Messages
-    """
+    def perform_create(self, serializer):
+        """Create a new conversation"""
+        serializer.save()
 
+
+class MessageViewSet(viewsets.ModelViewSet):
+    """ViewSet for Messages"""
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
+    filter_backends = [filters.SearchFilter]   # ✅ use filters
+    search_fields = ['sender__first_name', 'sender__last_name', 'message_body']
 
     def create(self, request, *args, **kwargs):
         """
@@ -66,6 +71,10 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def perform_create(self, serializer):
+        """Send a new message to a conversation"""
+        serializer.save(sender=self.request.user)
 
     @action(detail=True, methods=["get"])
     def by_conversation(self, request, pk=None):

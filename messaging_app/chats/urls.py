@@ -1,10 +1,10 @@
-from django.urls import path
-from . import views
 from django.urls import path, include
+from . import views
+from rest_framework import routers, viewsets, filters   
 from rest_framework.routers import DefaultRouter
 from .views import ConversationViewSet, MessageViewSet
 
-router = DefaultRouter()
+router = routers.DefaultRouter()
 router.register(r'conversations', ConversationViewSet, basename='conversation')
 router.register(r'messages', MessageViewSet, basename='message')
 
@@ -16,3 +16,5 @@ urlpatterns = [
 urlpatterns = [
     path('', views.index, name='index'),
 ]
+
+

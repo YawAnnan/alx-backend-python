@@ -8,7 +8,13 @@ urlpatterns = [
     path('api/', include('chats.urls')),  # all API endpoints under /api/
 ]
 
-urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/', include('chats.urls')),  # include chats endpoints
-]
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += [path('__debug__/', include('debug_toolbar.urls'))]
+
+# For production, ensure proper handling of static and media files via web server
+
+# and consider security best practices.
+
+# End of file
