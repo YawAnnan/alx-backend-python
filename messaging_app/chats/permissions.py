@@ -1,13 +1,15 @@
 from rest_framework import permissions
 
+
 class IsOwner(permissions.BasePermission):
     """
     Custom permission: only allow users to access their own objects.
     """
 
     def has_object_permission(self, request, view, obj):
-        # Assuming your message/conversation model has a `user` field
-        return obj.user == request.user
+        # Assuming your model has a user field
+        return hasattr(obj, "user") and obj.user == request.user
+
 
 class IsParticipantOfConversation(permissions.BasePermission):
     """
@@ -17,16 +19,28 @@ class IsParticipantOfConversation(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
-        # First check: user must be authenticated
+        # User must be authenticated
         return request.user and request.user.is_authenticated
 
     def has_object_permission(self, request, view, obj):
+        user = request.user
+
         # Case 1: object is a Conversation
         if hasattr(obj, "participants"):
-            return request.user in obj.participants.all()
+            if user not in obj.participants.all():
+                return False
 
         # Case 2: object is a Message
         if hasattr(obj, "conversation"):
-            return request.user in obj.conversation.participants.all()
+            if user not in obj.conversation.participants.all():
+                return False
+
+        # Explicitly check methods: only participants can update or delete
+        if request.method in ["PUT", "PATCH", "DELETE"]:
+            return True  # already confirmed user is a participant
+
+        # GET, POST allowed if participant
+        if request.method in ["GET", "POST"]:
+            return True
 
         return False

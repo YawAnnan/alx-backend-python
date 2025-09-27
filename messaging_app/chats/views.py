@@ -12,15 +12,16 @@ from .permissions import IsParticipantOfConversation
 
 class ConversationViewSet(viewsets.ModelViewSet):
     """ViewSet for Conversations"""
-    queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = [
-        "participants__username",
-        "participants__first_name",
-        "participants__last_name",
-    ]
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["participants__username"]
+
+    def get_queryset(self):
+        """
+        ✅ Users should only see conversations they are part of
+        """
+        return Conversation.objects.filter(participants=self.request.user)
 
     def create(self, request, *args, **kwargs):
         """
@@ -41,18 +42,23 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
-        """Automatically add the current user to conversation participants"""
+        """Ensure creator is part of the conversation"""
         conversation = serializer.save()
         conversation.participants.add(self.request.user)
 
 
 class MessageViewSet(viewsets.ModelViewSet):
     """ViewSet for Messages"""
-    queryset = Message.objects.all()
     serializer_class = MessageSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ["sender_username", "senderfirst_name", "sender_last_name", "message_body"]
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["sender_first_name", "sender_last_name", "message_body"]
+
+    def get_queryset(self):
+        """
+        ✅ Ensure users only see messages from conversations they participate in
+        """
+        return Message.objects.filter(conversation__participants=self.request.user)
 
     def create(self, request, *args, **kwargs):
         """
@@ -61,20 +67,20 @@ class MessageViewSet(viewsets.ModelViewSet):
         conversation_id = request.data.get("conversation")
         message_body = request.data.get("message_body")
 
-        if not (conversation_id and message_body):
-            return Response(
-                {"error": "conversation and message_body are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         conversation = get_object_or_404(Conversation, pk=conversation_id)
+
+        # ✅ Check participant access
+        if request.user not in conversation.participants.all():
+            return Response(
+                {"error": "You are not allowed to send messages in this conversation."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         message = Message.objects.create(
             conversation=conversation,
             sender=request.user,
             message_body=message_body,
         )
-
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -84,6 +90,14 @@ class MessageViewSet(viewsets.ModelViewSet):
         Custom endpoint to get all messages in a conversation
         """
         conversation = get_object_or_404(Conversation, pk=pk)
+
+        # ✅ Ensure only participants can view
+        if request.user not in conversation.participants.all():
+            return Response(
+                {"error": "You are not allowed to view this conversation."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         messages = conversation.messages.all().order_by("sent_at")
         serializer = self.get_serializer(messages, many=True)
         return Response(serializer.data)
