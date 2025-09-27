@@ -4,18 +4,22 @@ from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from .permissions import IsParticipantOfConversation
+from .filters import MessageFilter
+from .pagination import MessagePagination
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
     """ViewSet for Conversations"""
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ["participants__username"]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ["participants__username", "participants__first_name", "participants__last_name"]
+    filterset_fields = ["participants"]
 
     def get_queryset(self):
         """
@@ -51,8 +55,10 @@ class MessageViewSet(viewsets.ModelViewSet):
     """ViewSet for Messages"""
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated, IsParticipantOfConversation]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ["sender_first_name", "sender_last_name", "message_body"]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ["sender__first_name", "sender__last_name", "message_body"]
+    filterset_class = MessageFilter
+    pagination_class = MessagePagination
 
     def get_queryset(self):
         """
@@ -99,6 +105,11 @@ class MessageViewSet(viewsets.ModelViewSet):
             )
 
         messages = conversation.messages.all().order_by("sent_at")
+        page = self.paginate_queryset(messages)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
         serializer = self.get_serializer(messages, many=True)
         return Response(serializer.data)
 
