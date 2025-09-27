@@ -91,3 +91,37 @@ class OffensiveLanguageMiddleware:
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+class RolePermissionMiddleware:
+    """
+    Middleware to enforce role-based permissions.
+    Only allows access to admins or moderators for restricted actions.
+    """
+
+    # Define restricted paths where role check applies
+    RESTRICTED_PATHS = [
+        '/admin-action/',  # replace with actual restricted paths
+        '/delete-message/',
+        '/manage-users/',
+    ]
+
+    ALLOWED_ROLES = ['admin', 'moderator']
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Only check restricted paths
+        for path in self.RESTRICTED_PATHS:
+            if request.path.startswith(path):
+                user = getattr(request, 'user', None)
+
+                # If user is not authenticated or role not allowed
+                if not user or not hasattr(user, 'role') or user.role not in self.ALLOWED_ROLES:
+                    return HttpResponseForbidden(
+                        "You do not have permission to perform this action."
+                    )
+
+        response = self.get_response(request)
+        return response
