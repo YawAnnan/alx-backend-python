@@ -1,22 +1,27 @@
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.shortcuts import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
-
-
+from .permissions import IsParticipantOfConversation
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
     """ViewSet for Conversations"""
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
-    filter_backends = [filters.SearchFilter]   # ✅ use filters
-    search_fields = ['participants__first_name', 'participants__last_name']
-    
+    filter_backends = [filters.SearchFilter]
+    search_fields = [
+        "participants__username",
+        "participants__first_name",
+        "participants__last_name",
+    ]
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]
+
     def create(self, request, *args, **kwargs):
         """
         Create a new conversation with participants
@@ -35,18 +40,19 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(conversation)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-
     def perform_create(self, serializer):
-        """Create a new conversation"""
-        serializer.save()
+        """Automatically add the current user to conversation participants"""
+        conversation = serializer.save()
+        conversation.participants.add(self.request.user)
 
 
 class MessageViewSet(viewsets.ModelViewSet):
     """ViewSet for Messages"""
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
-    filter_backends = [filters.SearchFilter]   # ✅ use filters
-    search_fields = ['sender__first_name', 'sender__last_name', 'message_body']
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["sender_username", "senderfirst_name", "sender_last_name", "message_body"]
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]
 
     def create(self, request, *args, **kwargs):
         """
@@ -54,27 +60,23 @@ class MessageViewSet(viewsets.ModelViewSet):
         """
         conversation_id = request.data.get("conversation")
         message_body = request.data.get("message_body")
-        sender_id = request.data.get("sender")
 
-        if not (conversation_id and message_body and sender_id):
+        if not (conversation_id and message_body):
             return Response(
-                {"error": "conversation, sender, and message_body are required."},
+                {"error": "conversation and message_body are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         conversation = get_object_or_404(Conversation, pk=conversation_id)
+
         message = Message.objects.create(
             conversation=conversation,
-            sender_id=sender_id,
+            sender=request.user,
             message_body=message_body,
         )
 
         serializer = self.get_serializer(message)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    def perform_create(self, serializer):
-        """Send a new message to a conversation"""
-        serializer.save(sender=self.request.user)
 
     @action(detail=True, methods=["get"])
     def by_conversation(self, request, pk=None):
