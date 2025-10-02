@@ -1,6 +1,8 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from messaging.models import Message, Notification, MessageHistory
+from django.db.models.signals import post_delete
+from django.contrib.auth import get_user_model
 
 # ✅ Signal 1: Notify receiver when a new message is created
 @receiver(post_save, sender=Message)
@@ -27,3 +29,22 @@ def log_message_edit(sender, instance, **kwargs):
             instance.edited = True
         except Message.DoesNotExist:
             pass
+    
+
+User = get_user_model()
+
+
+@receiver(post_delete, sender=User)
+def delete_related_data(sender, instance, **kwargs):
+    """
+    Clean up all user-related data when a User is deleted.
+    """
+    # Delete messages where user is sender or receiver
+    Message.objects.filter(sender=instance).delete()
+    Message.objects.filter(receiver=instance).delete()
+
+    # Delete notifications belonging to the user
+    Notification.objects.filter(user=instance).delete()
+
+    # Delete message histories where edited_by is the user
+    MessageHistory.objects.filter(edited_by=instance).delete()
