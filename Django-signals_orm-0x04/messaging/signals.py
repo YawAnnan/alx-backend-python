@@ -19,11 +19,11 @@ def log_message_edit(sender, instance, **kwargs):
         try:
             old_message = Message.objects.get(pk=instance.pk)
             if old_message.content != instance.content:
-                # Save history before update
                 MessageHistory.objects.create(
                     message=old_message,
                     old_content=old_message.content,
-                )
-                instance.edited = True
+                    edited_by=instance.sender  # ✅ Track who edited
+            )
+            instance.edited = True
         except Message.DoesNotExist:
             pass
