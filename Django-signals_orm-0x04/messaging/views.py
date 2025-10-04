@@ -7,9 +7,10 @@ from rest_framework import viewsets, status
 from django.shortcuts import get_object_or_404
 from .models import Conversation, Message
 from .serializers import MessageSerializer
+from rest_framework import generics, permissions
+from .models import Message
 
 User = get_user_model()
-
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
@@ -24,8 +25,6 @@ def delete_user(request):
         {"detail": f"User {username} and related data deleted successfully."},
         status=status.HTTP_204_NO_CONTENT
     )
-
-
 
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all().select_related("sender", "parent_message").prefetch_related("replies")
@@ -45,3 +44,32 @@ class MessageViewSet(viewsets.ModelViewSet):
             "replies": message.get_thread(),
         }
         return Response(data, status=status.HTTP_200_OK)
+    
+
+class MessageListView(generics.ListAPIView):
+    """List all messages for the logged-in user (threaded)."""
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        # Fetch all messages for the logged-in user (sent or received)
+        queryset = Message.objects.filter(
+            sender=user
+        ) | Message.objects.filter(receiver=user)
+
+        # Optimize with select_related and prefetch_related
+        queryset = queryset.select_related('sender', 'receiver', 'parent_message').prefetch_related('replies')
+
+        return queryset
+
+    def get_thread(self, message):
+        """Recursive query to fetch all replies to a message."""
+        replies = Message.objects.filter(parent_message=message)
+        thread = []
+        for reply in replies:
+            thread.append({
+                'reply': reply,
+                'children': self.get_thread(reply)  # recursion for nested replies
+            })
+        return thread
