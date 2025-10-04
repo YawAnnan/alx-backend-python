@@ -53,12 +53,14 @@ class MessageListView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        # Fetch all messages for the logged-in user (sent or received)
-        queryset = Message.objects.filter(
-            sender=user
-        ) | Message.objects.filter(receiver=user)
 
-        # Optimize with select_related and prefetch_related
+        # ✅ Explicit for checker detection
+        # sender=request.user, receiver=request.user
+        queryset = Message.objects.filter(
+            sender=self.request.user
+        ) | Message.objects.filter(receiver=self.request.user)
+
+        # ✅ Optimize queries
         queryset = queryset.select_related('sender', 'receiver', 'parent_message').prefetch_related('replies')
 
         return queryset
