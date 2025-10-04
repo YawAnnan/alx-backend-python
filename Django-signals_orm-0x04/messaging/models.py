@@ -12,9 +12,9 @@ class Message(models.Model):
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
     edited = models.BooleanField(default=False)  # ✅ track if message was edited
-    '''edited_at = models.DateTimeField(null=True, blank=True)  # ✅ timestamp of last edit
+    edited_at = models.DateTimeField(null=True, blank=True)  # ✅ timestamp of last edit
     is_deleted = models.BooleanField(default=False)  # ✅ soft delete flag
-    deleted_at = models.DateTimeField(null=True, blank=True)  # ✅ timestamp of deletion'''
+    deleted_at = models.DateTimeField(null=True, blank=True)  # ✅ timestamp of deletion
 
     def _str_(self):
         return f"Message from {self.sender} to {self.receiver} at {self.timestamp}"
@@ -42,3 +42,55 @@ class MessageHistory(models.Model):
     )
     def _str_(self):
         return f"History of message {self.message.id} at {self.edited_at}"
+
+class Conversation(models.Model):
+    """Conversation between participants"""
+    participants = models.ManyToManyField(User, related_name="conversations")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Message(models.Model):
+    """Message model supporting threaded replies"""
+    conversation = models.ForeignKey(
+        Conversation, related_name="messages", on_delete=models.CASCADE
+    )
+    sender = models.ForeignKey(User, related_name="sent_messages", on_delete=models.CASCADE)
+    message_body = models.TextField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    # ✅ self-referential field for threading
+    parent_message = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="replies",
+        on_delete=models.CASCADE
+    )
+
+    edited = models.BooleanField(default=False)
+    edited_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        related_name="edited_messages",
+        on_delete=models.SET_NULL
+    )
+
+    def _str_(self):
+        return f"{self.sender.username}: {self.message_body[:30]}"
+
+    def get_thread(self):
+        """
+        ✅ Recursive function to fetch all replies in a threaded format
+        """
+        replies = self.replies.all().select_related("sender").prefetch_related("replies")
+        thread = []
+        for reply in replies:
+            thread.append({
+                "id": reply.id,
+                "sender": reply.sender.username,
+                "message_body": reply.message_body,
+                "sent_at": reply.sent_at,
+                "replies": reply.get_thread(),  # recursive
+            })
+        return thread
