@@ -16,6 +16,10 @@ class Message(models.Model):
     is_deleted = models.BooleanField(default=False)  # ✅ soft delete flag
     deleted_at = models.DateTimeField(null=True, blank=True)  # ✅ timestamp of deletion
 
+    # Custom manager
+    objects = models.Manager()  # Default manager
+    unread = UnreadMessagesManager()  # Custom manager
+
     def _str_(self):
         return f"Message from {self.sender} to {self.receiver} at {self.timestamp}"
     def __str__(self):
@@ -127,3 +131,10 @@ class Message(models.Model):
         """Mark the message as read."""
         self.read = True
         self.save()
+
+from django.db import models
+from django.contrib.auth import get_user_model
+from .managers import UnreadMessagesManager
+
+User = get_user_model()
+

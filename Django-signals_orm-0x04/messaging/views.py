@@ -83,3 +83,12 @@ class UnreadMessagesView(generics.ListAPIView):
 
     def get_queryset(self):
         return Message.unread.unread_for_user(self.request.user)
+    
+    class UnreadMessagesView(generics.ListAPIView):
+        """List unread messages for the authenticated user."""
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Message.unread.for_user(user).only("id", "sender", "receiver", "message_body", "sent_at")
