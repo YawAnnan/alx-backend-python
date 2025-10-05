@@ -75,3 +75,11 @@ class MessageListView(generics.ListAPIView):
                 'children': self.get_thread(reply)  # recursion for nested replies
             })
         return thread
+
+class UnreadMessagesView(generics.ListAPIView):
+    """Display unread messages for the logged-in user."""
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Message.unread.unread_for_user(self.request.user)

@@ -16,13 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from messaging import views   # ✅ import your app views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
-    # ✅ User deletion endpoint
-    path('api/delete-user/', views.delete_user, name='delete_user'),
-
-    # You can add more endpoints later here...
 ]

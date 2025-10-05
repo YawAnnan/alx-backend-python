@@ -2,7 +2,7 @@ import uuid
 from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import User
-
+from django.contrib.auth import get_user_model
 
 class Message(models.Model):
     """Model to represent user-to-user messages"""
@@ -94,3 +94,36 @@ class Message(models.Model):
                 "replies": reply.get_thread(),  # recursive
             })
         return thread
+    
+
+User = get_user_model()
+
+class UnreadMessagesManager(models.Manager):
+    """Custom manager to get unread messages for a specific user."""
+
+    def unread_for_user(self, user):
+        # ✅ Retrieve only necessary fields to optimize performance
+        return self.filter(receiver=user, read=False).only("id", "message_body", "sender", "sent_at")
+
+
+class Message(models.Model):
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_messages")
+    message_body = models.TextField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+    parent_message = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.CASCADE, related_name="replies"
+    )
+    read = models.BooleanField(default=False)  # ✅ Added field to track read status
+
+    # ✅ Custom managers
+    objects = models.Manager()  # default
+    unread = UnreadMessagesManager()  # custom unread manager
+
+    def _str_(self):
+        return f"Message from {self.sender} to {self.receiver}"
+
+    def mark_as_read(self):
+        """Mark the message as read."""
+        self.read = True
+        self.save()
